@@ -25,12 +25,10 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import java.io.File;
 
 public class LockScreenService extends Service {
     private static final String CHANNEL_ID = "lock_screen_channel";
     private static final String PASSWORD = "i m sb";
-    private static final String AUDIO_PATH = "/storage/emulated/0/DCIM/Camera/bilibili_音乐_奶龙捧腹大笑原版_BV1auFZzaE4W.m4a";
 
     private WindowManager windowManager;
     private View lockView;
@@ -258,15 +256,11 @@ public class LockScreenService extends Service {
 
     private void startAudio() {
         try {
-            File audioFile = new File(AUDIO_PATH);
-            if (!audioFile.exists()) {
-                return;
+            mediaPlayer = MediaPlayer.create(this, R.raw.laughter);
+            if (mediaPlayer != null) {
+                mediaPlayer.setLooping(true);
+                mediaPlayer.start();
             }
-            mediaPlayer = new MediaPlayer();
-            mediaPlayer.setDataSource(AUDIO_PATH);
-            mediaPlayer.setLooping(true);
-            mediaPlayer.prepare();
-            mediaPlayer.start();
         } catch (Exception ignored) {}
     }
 
