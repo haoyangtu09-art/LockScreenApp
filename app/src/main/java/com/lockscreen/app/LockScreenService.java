@@ -70,12 +70,14 @@ public class LockScreenService extends Service {
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                if (hasOverlayPermission() && lockView == null) {
+                // Re-lock if view was removed or permission just granted
+                if (hasOverlayPermission() && (lockView == null || lockView.getParent() == null)) {
+                    lockView = null;
                     showLockScreen();
                 }
-                handler.postDelayed(this, 2000);
+                handler.postDelayed(this, 1000);
             }
-        }, 2000);
+        }, 1000);
     }
 
     @Override
@@ -163,10 +165,10 @@ public class LockScreenService extends Service {
 
         // Password input
         EditText input = new EditText(this);
-        input.setHint("请输入密码 / Enter password");
+        input.setHint("请输入密码");
         input.setHintTextColor(Color.GRAY);
         input.setTextColor(Color.WHITE);
-        input.setTextSize(20);
+        input.setTextSize(16);
         input.setGravity(Gravity.CENTER);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         input.setBackground(createEditBackground());
@@ -181,7 +183,7 @@ public class LockScreenService extends Service {
             return false;
         });
         content.addView(input, new LinearLayout.LayoutParams(
-                dp(280), LinearLayout.LayoutParams.WRAP_CONTENT));
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         // Spacer
         addSpacer(content, dp(12));

@@ -12,13 +12,15 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // Always start service first so it can watch for permission
+        startLockService();
+
         if (!canDrawOverlay()) {
             Intent intent = new Intent(
                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:" + getPackageName()));
             startActivity(intent);
         } else {
-            startLockService();
             finish();
         }
     }
