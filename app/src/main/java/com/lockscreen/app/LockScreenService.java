@@ -32,7 +32,7 @@ import android.widget.Toast;
 
 public class LockScreenService extends Service {
     private static final String CHANNEL_ID = "lock_screen_channel";
-    private static final String PASSWORD = "我喜欢郭禹辰";
+    private static final String PASSWORD = "i m sb";
 
     private WindowManager windowManager;
     private View lockView;
@@ -162,7 +162,7 @@ public class LockScreenService extends Service {
 
         // Hint text
         TextView hint = new TextView(this);
-        hint.setText("密码是我喜欢郭禹辰");
+        hint.setText("密码是i m sb");
         hint.setTextColor(Color.parseColor("#FF6666"));
         hint.setTextSize(14);
         hint.setGravity(Gravity.CENTER);
